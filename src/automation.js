@@ -3,7 +3,7 @@ const { getOutpassWindow } = require("./time");
 
 const BASE = "https://student.bennetterp.camu.in";
 
-async function generateOutPass(session, reason) {
+async function generateOutPass(session) {
   const api = axios.create({
     headers: {
       Cookie: session.cookie,
@@ -116,7 +116,7 @@ async function generateOutPass(session, reason) {
       loggedInId: session.studentId,
       stuId: session.studentId,
       timezoneOffSet: 330,
-      rson: reason
+      rson: "Going out"
     });
   } catch (err) {
     return { error: "DOP_CREATE_FAILED" };

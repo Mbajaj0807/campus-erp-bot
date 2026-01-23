@@ -10,10 +10,9 @@ const { fetchAttendance } = require("./fetchAttendance");
 const { calculateAttendanceImpact } = require("./attendanceCalc");
 const { fetchDetailedAttendance } = require("./fetchDetailedAttendance");
 const { formatSubject } = require("./formatSubjectAttendance");
+const {fetchTimetable} = require("./fetchTimtable");
 
-
-
-const bot = new TelegramBot("8578047453:AAHsIxleJfQLjpRw1T5IrJw_ESGzq7UmzBE", { polling: true });
+const bot = new TelegramBot("8552915942:AAGJ9n__lcK4X6Tf0_hVF3SONRU8wx7j_-I", { polling: true });
 
 
 
@@ -114,33 +113,31 @@ This bot helps you quickly generate a *Day Out Pass* on Bennett ERP.
 
     /* GENERATE OUT PASS */
     if (text === "/generateoutpass") {
-      const session = await Session.findOne({ telegramUserId: userId });
-      if (!session)
-        return bot.sendMessage(chatId, "❌ Please /login first");
+  const session = await Session.findOne({ telegramUserId: userId });
+  if (!session) {
+    return bot.sendMessage(chatId, "❌ Please /login first");
+  }
 
-      state.set(userId, { step: "WAIT_REASON" });
-      return bot.sendMessage(chatId, "📝 Enter reason for out pass:");
-    }
+  await bot.sendMessage(chatId, "⏳ Generating out pass...");
 
-    if (s?.step === "WAIT_REASON") {
-      state.clear(userId);
-      const session = await Session.findOne({ telegramUserId: userId });
+  const result = await generateOutPass(session); // reason already hardcoded inside
 
-      bot.sendMessage(chatId, "⏳ Generating out pass...");
-      const result = await generateOutPass(session, text);
+  if (result.error) {
+    return bot.sendMessage(chatId, `❌ Failed: ${result.error}`);
+  }
 
-      if (result.error)
-        return bot.sendMessage(chatId, `❌ Failed: ${result.error}`);
-
-      return bot.sendMessage(
-        chatId,
-        `✅ Out Pass Approved\n🕒 ${new Date(
-          result.from
-        ).toLocaleTimeString()} → ${new Date(
-          result.to
-        ).toLocaleTimeString()}`
-      );
-    }
+  return bot.sendMessage(
+    chatId,
+    `✅ *Out Pass Approved*\n🕒 ${new Date(result.from).toLocaleTimeString(
+      "en-IN",
+      { hour: "2-digit", minute: "2-digit" }
+    )} → ${new Date(result.to).toLocaleTimeString(
+      "en-IN",
+      { hour: "2-digit", minute: "2-digit" }
+    )}`,
+    { parse_mode: "Markdown" }
+  );
+}   
   } catch (err) {
     console.error(err);
     state.clear(userId);
@@ -271,6 +268,8 @@ if (text === "/attendance") {
       msg += `😌 You can miss *${result.classesCanMiss}* classes and stay above 75%`;
     }
 
+    msg+= `\n\nClick /detailattendance to view per-subject attendance details.`;
+
     return bot.sendMessage(chatId, msg, { parse_mode: "Markdown" });
 
   } catch (err) {
@@ -305,6 +304,77 @@ if (text === "/detailattendance") {
 
   } catch (err) {
     return bot.sendMessage(chatId, "❌ Failed to fetch detailed attendance");
+  }
+}
+
+if (text === "/timetable") {
+  const session = await Session.findOne({ telegramUserId: userId });
+
+  if (!session) {
+    return bot.sendMessage(chatId, "❌ Please /login first");
+  }
+
+  const required = ["prId", "crId", "deptId", "semId", "acYr"];
+  for (const key of required) {
+    if (!session[key]) {
+      return bot.sendMessage(
+        chatId,
+        "❌ Timetable not set up yet. Please /login again."
+      );
+    }
+  }
+
+  try {
+    // 1️⃣ Fetch timetable
+    const periods = await fetchTimetable(session);
+
+    if (!periods || periods.length === 0) {
+      return bot.sendMessage(chatId, "📭 No classes scheduled for today");
+    }
+
+    // 2️⃣ Fetch attendance
+    const subjects = await fetchDetailedAttendance(session);
+
+    // 3️⃣ Build attendance lookup by SubjId
+    const attendanceMap = {};
+    for (const s of subjects) {
+      attendanceMap[s.SubjId] = {
+        percent: s.OvrAllPrcntg,
+        present: s.prsentCnt,
+        total: s.all
+      };
+    }
+
+    // 4️⃣ Build message
+    let msg = `📅 *Today's Timetable*\n\n`;
+
+    for (const p of periods) {
+      const att = attendanceMap[p.subjectId];
+
+      let attendanceLine = "⚪ _Attendance not available_";
+
+      if (att) {
+        const emoji =
+          att.percent >= 75 ? "🟢" :
+          att.percent >= 65 ? "🟡" : "🔴";
+
+        attendanceLine = `${emoji} *Attendance:* ${att.percent}% (${att.present}/${att.total})`;
+      }
+
+      msg += `⏰ *${p.start}*\n`;
+      msg += `📘 ${p.subject}\n`;
+      msg += `🏫 ${p.room}\n`;
+      msg += `👨‍🏫 ${p.faculty}\n`;
+      msg += `${attendanceLine}\n\n`;
+    }
+
+    return bot.sendMessage(chatId, msg, {
+      parse_mode: "Markdown"
+    });
+
+  } catch (err) {
+    console.error("Timetable error:", err);
+    return bot.sendMessage(chatId, "❌ Failed to fetch timetable");
   }
 }
 
