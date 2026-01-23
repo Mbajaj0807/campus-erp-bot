@@ -12,7 +12,7 @@ const { fetchDetailedAttendance } = require("./fetchDetailedAttendance");
 const { formatSubject } = require("./formatSubjectAttendance");
 const {fetchTimetable} = require("./fetchTimtable");
 
-const bot = new TelegramBot("8578047453:AAHsIxleJfQLjpRw1T5IrJw_ESGzq7UmzBE", { polling: true });
+const bot = new TelegramBot("8552915942:AAGJ9n__lcK4X6Tf0_hVF3SONRU8wx7j_-I", { polling: true });
 
 
 
@@ -168,29 +168,27 @@ This bot helps you quickly generate a *Day Out Pass* on Bennett ERP.
       msg += `*${meal.msCde || meal.meal || "Meal"}*\n`;
 
       let items = [];
-
-if (typeof meal.msNme === "string") {
-  items = meal.msNme
-    .split("\n")
-    .map(i => i.trim())
-    .filter(Boolean);
-} else if (Array.isArray(meal.oItems)) {
-  items = meal.oItems;
-} else if (Array.isArray(meal.foodItems)) {
-  items = meal.foodItems;
-}
-
-
-      if (items.length === 0) {
-  msg += `_No items listed_\n\n`;
-  continue;
-}
-
-for (const item of items) {
-  msg += `• ${item}\n`;
-}
-msg += `\n`;
-
+      if (typeof meal.msNme === "string") {
+        items = meal.msNme
+        .split("\n")
+        .map(i => i.trim())
+        .filter(Boolean);
+      } 
+      for (const item of items) {
+        msg += `• ${item}\n`;
+      }
+      msg += `\n`;
+      if (meal.srvSts === 'P'){
+        console.log("Meal Status: ", meal.srvSts);
+        msg += `Status: ❌🍛Not Served\n`;
+      }
+      else if (meal.srvSts === 'C'){
+        msg += `Status: ✅🍛Served at ${meal.srvDte || 'N/A'}\n`;
+      }
+      else{
+        msg += `Status: Unknown\n`;
+      }
+      msg += `\n`;
     }
 
     return bot.sendMessage(chatId, msg, {
