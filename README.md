@@ -37,5 +37,3 @@ This is an **unofficial, read-only automation project** created purely for educa
 No data is modified, bypassed, or misused.
 
 ---
-
-⭐ If you’re reviewing this as a recruiter: this project reflects backend fundamentals, real-world API handling, and system-level thinking.
